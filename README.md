@@ -167,10 +167,14 @@ try {
 | Key                       | Env var                  | Default                     | Notes |
 |---------------------------|--------------------------|-----------------------------|-------|
 | `api_key`                 | `SCRAPPY_API_KEY`        | —                           | Required. |
-| `base_url`                | `SCRAPPY_BASE_URL`       | `https://api.scrappy.hu`    | Override for self-hosted. |
 | `timeout`                 | `SCRAPPY_TIMEOUT`        | `30`                        | Per-call HTTP timeout (seconds). |
 | `webhook_secret`          | `SCRAPPY_WEBHOOK_SECRET` | —                           | Optional default secret for `verify()`. |
 | `replay_window_seconds`   | —                        | `300`                       | Reject signatures older than this. |
+
+The base URL is intentionally not configurable from Laravel — every
+Laravel-driven instance points at `https://api.scrappy.hu`. Plain-PHP
+users can still override it via the `Scrappy` constructor for tests
+or unusual self-hosted setups.
 
 ## Plain PHP usage
 

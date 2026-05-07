@@ -25,9 +25,14 @@ class ScrappyServiceProvider extends ServiceProvider
         $this->app->singleton(Scrappy::class, function (Application $app): Scrappy {
             $config = $app['config']->get('scrappy');
 
+            // Base URL is intentionally NOT pulled from config — the
+            // SDK always points at api.scrappy.hu in Laravel mode.
+            // Plain-PHP integrations can still override via the
+            // constructor (used in tests + the unlikely self-hosted
+            // Scrappy edge case), but consumers shouldn't be able to
+            // misconfigure their way into the wrong server via .env.
             return new Scrappy(
                 apiKey: (string) ($config['api_key'] ?? ''),
-                baseUrl: (string) ($config['base_url'] ?? 'https://api.scrappy.hu'),
                 timeout: (int) ($config['timeout'] ?? 30),
                 replayWindowSeconds: (int) ($config['replay_window_seconds'] ?? 300),
             );
