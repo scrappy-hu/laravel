@@ -1,0 +1,52 @@
+{
+    "name": "scrappy-hu/laravel",
+    "description": "Official Scrappy SDK for Laravel — submit scrape jobs and verify webhooks against api.scrappy.hu.",
+    "keywords": ["scrappy", "laravel", "scraping", "webhooks", "api", "playwright"],
+    "license": "MIT",
+    "type": "library",
+    "homepage": "https://scrappy.hu",
+    "support": {
+        "issues": "https://github.com/scrappy-hu/laravel/issues",
+        "source": "https://github.com/scrappy-hu/laravel",
+        "docs": "https://scrappy.hu/docs"
+    },
+    "require": {
+        "php": "^8.1",
+        "ext-json": "*",
+        "guzzlehttp/guzzle": "^7.5",
+        "illuminate/contracts": "^10.0|^11.0|^12.0",
+        "illuminate/support": "^10.0|^11.0|^12.0"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^10.5|^11.0",
+        "orchestra/testbench": "^8.0|^9.0|^10.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Scrappy\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Scrappy\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "phpunit"
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Scrappy\\ScrappyServiceProvider"
+            ],
+            "aliases": {
+                "Scrappy": "Scrappy\\Facades\\Scrappy"
+            }
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true,
+    "config": {
+        "sort-packages": true
+    }
+}
