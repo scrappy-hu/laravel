@@ -1,7 +1,11 @@
 # Scrappy SDK for Laravel
 
 Submit web-scraping jobs and verify webhooks against
-[api.scrappy.hu](https://scrappy.hu) from any Laravel 10 / 11 / 12 app.
+[api.scrappy.hu](https://scrappy.hu) from any Laravel 9 / 10 / 11 / 12 app.
+
+Requires PHP 8.1+ (the SDK uses `readonly` properties for typed
+response objects, which Laravel 9 + PHP 8.0 doesn't support — bump
+PHP to 8.1+ and you're fine on any Laravel 9.x).
 
 ```bash
 composer require scrappy-hu/laravel
