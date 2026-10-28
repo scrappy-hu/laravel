@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Scrappy;
 
+use GuzzleHttp\Client as Guzzle;
 use Scrappy\Http\Client;
 use Scrappy\Resources\Jobs;
 use Scrappy\Resources\Me;
@@ -34,13 +35,16 @@ class Scrappy
         string $baseUrl = 'https://api.scrappy.hu',
         int $timeout = 30,
         int $replayWindowSeconds = 300,
+        ?string $webhookSecret = null,
+        ?Guzzle $guzzle = null,
     ) {
-        $this->http = new Client($apiKey, $baseUrl, $timeout);
+        $this->http = new Client($apiKey, $baseUrl, $timeout, $guzzle);
         $this->jobs = new Jobs($this->http);
         $this->me = new Me($this->http);
         $this->webhooks = new Webhooks(
             $this->http,
             new SignatureVerifier($replayWindowSeconds),
+            $webhookSecret,
         );
     }
 

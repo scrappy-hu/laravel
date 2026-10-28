@@ -30,16 +30,14 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Default Webhook Secret
+    | Webhook Secret
     |--------------------------------------------------------------------------
     |
-    | Used by Scrappy::webhooks()->verify() when no explicit secret is passed.
-    | Each job gets a fresh per-job secret returned by POST /v1/jobs — store
-    | that in your database and pass to verify() at receive time. This config
-    | value is only useful for /v1/webhooks/test calls or if you choose to
-    | reuse a single secret across all jobs (not recommended).
+    | Your API key's webhook signing secret. Create it once in the dashboard
+    | (https://scrappy.hu/dashboard/api-keys → Webhook → key-level secret):
+    | every job of the key is then signed with it. Required by
+    | Scrappy::webhooks()->verify() and the Route::scrappyWebhook() receiver.
     |
-    */
     'webhook_secret' => env('SCRAPPY_WEBHOOK_SECRET'),
 
     /*

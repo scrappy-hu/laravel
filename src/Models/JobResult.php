@@ -30,6 +30,8 @@ class JobResult
         public readonly ?string $errorType,
         public readonly ?string $errorMessage,
         public readonly ?string $screenshotUrl,
+        /** How Scrappy classified the answer: ok, final, transient, blocked, error. */
+        public readonly ?string $outcome,
     ) {
     }
 
@@ -55,6 +57,7 @@ class JobResult
             errorType: isset($data['error_type']) && is_string($data['error_type']) ? $data['error_type'] : null,
             errorMessage: isset($data['error_message']) && is_string($data['error_message']) ? $data['error_message'] : null,
             screenshotUrl: isset($data['screenshot_url']) && is_string($data['screenshot_url']) ? $data['screenshot_url'] : null,
+            outcome: isset($data['outcome']) && is_string($data['outcome']) ? $data['outcome'] : null,
         );
     }
 }

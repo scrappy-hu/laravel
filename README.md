@@ -22,95 +22,129 @@ Then in `.env`:
 
 ```
 SCRAPPY_API_KEY=sk_live_...
+SCRAPPY_WEBHOOK_SECRET=...
 ```
 
-Generate the key from <https://scrappy.hu/dashboard/api-keys>.
+Both come from <https://scrappy.hu/dashboard/api-keys>: the API key, and
+under **Webhook** the key's signing secret (*Create a key-level secret*,
+shown once). Every job of the key is signed with that one secret.
 
-That's it — the package's `ScrappyServiceProvider` is auto-registered
-via Laravel's package discovery, and the `Scrappy` facade is wired up.
+The `ScrappyServiceProvider` is auto-registered via package discovery,
+and the `Scrappy` facade is wired up.
 
-## Submit a job
+## Receive results by webhook
+
+Register the receiver once, e.g. in `routes/api.php`:
+
+```php
+Route::scrappyWebhook('scrappy/webhook'); // POST, named `scrappy.webhook`
+```
+
+It verifies `X-Scrappy-Signature` with `SCRAPPY_WEBHOOK_SECRET` (401 if it
+doesn't match), answers 200 at once, and dispatches an event:
+
+| Event | When |
+|---|---|
+| `Scrappy\Events\JobCompleted` | the page answered; `$e->webhook->result` holds it (check `->httpStatus`, a 404 completes too) |
+| `Scrappy\Events\JobFailed` | no usable answer (timeout, crash, a bot wall on every attempt); `$e->webhook->error` says why |
+| `Scrappy\Events\WebhookTestReceived` | a test delivery from `Scrappy::webhooks()->test()` |
+
+Listen with a queued listener, so the receiver answers Scrappy quickly:
+
+```php
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Scrappy\Events\JobCompleted;
+
+final class StoreScrapedProduct implements ShouldQueue
+{
+    public function handle(JobCompleted $event): void
+    {
+        $webhook = $event->webhook;
+        $product = Product::find($webhook->clientReferenceId); // your id, sent back
+        $product?->applyScrape($webhook->result->html, $webhook->result->httpStatus);
+    }
+}
+```
+
+Scrappy retries a delivery that doesn't get a 2xx (after 1 min, 5 min,
+30 min, 2 h and 6 h), so a delivery can arrive more than once: keep
+listeners idempotent.
+
+The route sits outside the CSRF check (Scrappy signs instead). Put it
+behind no auth middleware: the signature is the authentication.
+
+## Submit jobs
 
 ```php
 use Scrappy\Facades\Scrappy;
 
-$job = Scrappy::jobs()->create([
-    'url' => 'https://example.com/products/widget',
-    'options' => [
-        'extract' => ['title', 'description', 'tables'],
-    ],
-    'webhook_url' => route('scrappy.webhook'),
-    'metadata' => ['order_id' => $order->id],
-]);
+// Many at once: POST /v1/jobs/batch, 100 per request, in order.
+$created = Scrappy::jobs()->createMany(
+    $products->map(fn ($p) => [
+        'url' => $p->url,
+        'client_reference_id' => (string) $p->id, // comes back in the webhook
+        'priority' => 'low',                      // bulk refresh: behind on-demand jobs
+        'webhook_url' => route('scrappy.webhook'),
+        'options' => [
+            'wait_until' => 'domcontentloaded',
+            'block_trackers' => true,
+        ],
+    ])->all(),
+    idempotencyKey: 'feed-198-'.today()->toDateString(), // safe to retry the whole call
+);
 
-// store $job->webhookSecret somewhere keyed by $job->id —
-// you'll need it to verify the inbound webhook.
-DB::table('scrappy_jobs')->insert([
-    'id' => $job->id,
-    'order_id' => $order->id,
-    'webhook_secret' => $job->webhookSecret,
-    'created_at' => now(),
-]);
-
-return ['job_id' => $job->id, 'status' => $job->status];
+// One job:
+$job = Scrappy::jobs()->create(['url' => 'https://example.com', 'webhook_url' => route('scrappy.webhook')]);
 ```
 
+Set the key's default webhook URL in the dashboard and you can leave out
+`webhook_url`.
+
 ## Read a job
+
+Results also stay readable for 24 hours after a job ends:
 
 ```php
 $job = Scrappy::jobs()->get($jobId);
 
 if ($job->status === 'completed') {
-    $title = $job->result?->title;
+    $status = $job->result?->httpStatus;
     $html = $job->result?->html;
 }
 ```
 
-## Verify a webhook
+## Verify a webhook yourself
+
+`Route::scrappyWebhook()` does this for you. For a hand-written receiver:
 
 ```php
-use Illuminate\Http\Request;
-use Scrappy\Facades\Scrappy;
-
-Route::post('/scrappy/webhook', function (Request $request) {
-    $jobId = $request->header('X-Scrappy-Job-Id');
-    $stored = DB::table('scrappy_jobs')->where('id', $jobId)->first();
-    if (! $stored) {
-        abort(404);
-    }
-
-    $verified = Scrappy::webhooks()->verify(
-        rawBody: $request->getContent(),
-        header: $request->header('X-Scrappy-Signature'),
-        secret: $stored->webhook_secret,
-    );
-    if (! $verified) {
-        abort(401, 'Invalid signature');
-    }
-
-    $event = $request->json()->all();
-    if ($event['event'] === 'job.completed') {
-        // … process the result
-    }
-
-    return response()->noContent();
-});
+if (! Scrappy::webhooks()->verify($request->getContent(), $request->header('X-Scrappy-Signature'))) {
+    abort(401);
+}
+$event = Scrappy::webhooks()->parse($request->getContent()); // Scrappy\Models\WebhookEvent
 ```
 
-**Critical**: pass the **raw** request body (`$request->getContent()`).
-Re-serialising via `json_encode($request->json())` reorders / spaces
-keys differently and breaks the HMAC.
+Pass the **raw** body (`$request->getContent()`): re-encoding the JSON
+changes the bytes and breaks the HMAC.
 
 ## Test your webhook receiver
 
-Before going live, fire a test event from the SDK to verify your
-endpoint is reachable + signature verification works end-to-end:
-
 ```php
-$result = Scrappy::webhooks()->test('https://your-app.example.com/scrappy/webhook');
-// $result['delivered'] === true
-// $result['response_status'] === 200
+$result = Scrappy::webhooks()->test(); // the key's webhook URL, or pass one
+// $result['delivered'] === true, $result['response_status'] === 200
 ```
+
+The test delivery is signed with your key's secret, so it exercises the
+same verification as real deliveries (and fires `WebhookTestReceived`).
+
+## Upgrading from 0.1
+
+- Webhooks are verified with one key-level secret (`SCRAPPY_WEBHOOK_SECRET`)
+  instead of a secret stored per job. Create it in the dashboard first;
+  `verify()` throws a `ScrappyException` (`config_error`) without one.
+- `Route::scrappyWebhook()` replaces a hand-written receiver.
+- `Scrappy::jobs()->createMany()` submits batches.
+- `JobCreated::$webhookSecretSource` and `JobResult::$outcome` are new.
 
 ## Account snapshot
 
@@ -168,7 +202,7 @@ try {
 |---------------------------|--------------------------|-----------------------------|-------|
 | `api_key`                 | `SCRAPPY_API_KEY`        | —                           | Required. |
 | `timeout`                 | `SCRAPPY_TIMEOUT`        | `30`                        | Per-call HTTP timeout (seconds). |
-| `webhook_secret`          | `SCRAPPY_WEBHOOK_SECRET` | —                           | Optional default secret for `verify()`. |
+| `webhook_secret`          | `SCRAPPY_WEBHOOK_SECRET` | —                           | The key's webhook signing secret (dashboard → API keys → Webhook). Required for receiving webhooks. |
 | `replay_window_seconds`   | —                        | `300`                       | Reject signatures older than this. |
 
 The base URL is intentionally not configurable from Laravel — every
@@ -205,8 +239,10 @@ $handler = new MockHandler([
         'created_at' => '2026-05-08T10:00:00Z',
     ])),
 ]);
-$scrappy = new \Scrappy\Scrappy('sk_live_test', 'https://api.scrappy.hu');
-// (For full mocking inject a Guzzle client into Scrappy\Http\Client — see tests/.)
+$scrappy = new \Scrappy\Scrappy('sk_live_test', guzzle: new Client([
+    'handler' => HandlerStack::create($handler),
+    'base_uri' => 'https://api.scrappy.hu/',
+]));
 ```
 
 ## API reference

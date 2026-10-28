@@ -44,6 +44,35 @@ class Jobs
         return JobCreated::fromArray($body);
     }
 
+    /** Most jobs POST /v1/jobs/batch takes in one request. */
+    public const BATCH_SIZE = 100;
+
+    /**
+     * Submit many jobs: POST /v1/jobs/batch, BATCH_SIZE per request, in
+     * order. Returns one JobCreated per input, same order. With an
+     * idempotency key, chunk n is sent as "{key}:{n}", so retrying the
+     * whole call after a network failure creates no duplicates.
+     *
+     * Put your own id in each job's `client_reference_id`: the webhook
+     * brings it back.
+     *
+     * @param  list<array<string, mixed>>  $payloads
+     * @return list<JobCreated>
+     */
+    public function createMany(array $payloads, ?string $idempotencyKey = null): array
+    {
+        $created = [];
+        foreach (array_chunk(array_values($payloads), self::BATCH_SIZE) as $n => $chunk) {
+            $headers = $idempotencyKey !== null ? ['Idempotency-Key' => $idempotencyKey.':'.$n] : [];
+            $body = $this->http->post('/v1/jobs/batch', ['jobs' => $chunk], $headers);
+            foreach ($body['jobs'] ?? [] as $job) {
+                $created[] = JobCreated::fromArray(is_array($job) ? $job : []);
+            }
+        }
+
+        return $created;
+    }
+
     /** Fetch a job by id. Returns the full Job — including `result` once terminal. */
     public function get(string $jobId): Job
     {

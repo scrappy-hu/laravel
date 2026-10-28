@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace Scrappy\Models;
 
 /**
- * Response of POST /v1/jobs. The `webhookSecret` is returned ONCE on
- * creation when the request supplied a `webhook_url` — store it on
- * your side immediately, it's the HMAC key you'll use to verify the
- * inbound webhook signature.
+ * One created job (POST /v1/jobs, an entry of POST /v1/jobs/batch).
+ *
+ * `webhookSecretSource` says which secret signs its webhooks: `api_key`
+ * (your SCRAPPY_WEBHOOK_SECRET; `webhookSecret` is then null) or `job`
+ * (a key without its own secret: `webhookSecret` is this job's, shown
+ * only here).
  */
 class JobCreated
 {
@@ -17,8 +19,9 @@ class JobCreated
         public readonly string $status,
         public readonly string $createdAt,
         public readonly ?int $estimatedWaitSeconds,
-        /** Per-job HMAC secret. Only present when `webhook_url` was set. */
+        /** This job's own secret, only for a key without a key-level one. */
         public readonly ?string $webhookSecret,
+        public readonly ?string $webhookSecretSource,
     ) {
     }
 
@@ -36,6 +39,9 @@ class JobCreated
                 : null,
             webhookSecret: isset($data['webhook_secret']) && is_string($data['webhook_secret'])
                 ? $data['webhook_secret']
+                : null,
+            webhookSecretSource: isset($data['webhook_secret_source']) && is_string($data['webhook_secret_source'])
+                ? $data['webhook_secret_source']
                 : null,
         );
     }
