@@ -137,6 +137,6 @@ final class Client
         // Hard-coded — composer doesn't provide a clean way to read the
         // installed version of the running package itself at runtime.
         // Bump on every release.
-        return '0.1.0';
+        return '0.2.0';
     }
 }
