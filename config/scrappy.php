@@ -38,6 +38,7 @@ return [
     | every job of the key is then signed with it. Required by
     | Scrappy::webhooks()->verify() and the Route::scrappyWebhook() receiver.
     |
+    */
     'webhook_secret' => env('SCRAPPY_WEBHOOK_SECRET'),
 
     /*
