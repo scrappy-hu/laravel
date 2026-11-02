@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1
+
+- `SCRAPPY_WEBHOOK_SECRET` is read again: in `config/scrappy.php` the `webhook_secret` key sat inside an unclosed comment block, so `verify()` and `Route::scrappyWebhook()` threw `config_error` unless the secret was set in code. If you published the config, republish it (`php artisan vendor:publish --tag=scrappy-config --force`) or close the comment above `webhook_secret` yourself.
+
 ## 0.2.0 — 2026-10-28
 
 Breaking: webhooks are verified with the API key's own signing secret.
