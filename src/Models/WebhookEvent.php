@@ -11,6 +11,9 @@ namespace Scrappy\Models;
  *    `result->httpStatus`, it may be a 404).
  *  - `job.failed`: no usable answer; `result` is null, `error` says why.
  *  - `webhook.test`: a test delivery from POST /v1/webhooks/test.
+ *  - `action.completed`: an action job ended (any outcome); `action()`
+ *    holds it. `action.reconciled`: a late report settled an uncertain
+ *    one (to succeeded or partial).
  *
  * `clientReferenceId` and `metadata` come back as you sent them, so a
  * receiver can find its own record without storing Scrappy job ids.
@@ -20,6 +23,8 @@ class WebhookEvent
     public const COMPLETED = 'job.completed';
     public const FAILED = 'job.failed';
     public const TEST = 'webhook.test';
+    public const ACTION_COMPLETED = 'action.completed';
+    public const ACTION_RECONCILED = 'action.reconciled';
 
     public function __construct(
         public readonly string $event,
@@ -54,6 +59,22 @@ class WebhookEvent
         return $this->event === self::TEST;
     }
 
+    public function isActionCompleted(): bool
+    {
+        return $this->event === self::ACTION_COMPLETED;
+    }
+
+    public function isActionReconciled(): bool
+    {
+        return $this->event === self::ACTION_RECONCILED;
+    }
+
+    /** The action job of an action.* event; null for job events. */
+    public function action(): ?ActionResult
+    {
+        return $this->isActionCompleted() || $this->isActionReconciled() ? ActionResult::fromArray($this->raw) : null;
+    }
+
     /**
      * The decoded body, for fields not mapped here.
      *
@@ -73,7 +94,7 @@ class WebhookEvent
 
         return new self(
             event: (string) ($data['event'] ?? ''),
-            jobId: $str('job_id'),
+            jobId: $str('job_id') ?? $str('action_id'),
             status: $str('status'),
             url: $str('url'),
             clientReferenceId: $str('client_reference_id'),
