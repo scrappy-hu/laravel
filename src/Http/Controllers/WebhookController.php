@@ -6,6 +6,8 @@ namespace Scrappy\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Scrappy\Events\ActionCompleted;
+use Scrappy\Events\ActionReconciled;
 use Scrappy\Events\JobCompleted;
 use Scrappy\Events\JobFailed;
 use Scrappy\Events\WebhookTestReceived;
@@ -37,6 +39,8 @@ final class WebhookController
             $event->isCompleted() => JobCompleted::dispatch($event),
             $event->isFailed() => JobFailed::dispatch($event),
             $event->isTest() => WebhookTestReceived::dispatch($event),
+            $event->isActionCompleted() => ActionCompleted::dispatch($event, $event->action()),
+            $event->isActionReconciled() => ActionReconciled::dispatch($event, $event->action()),
             default => null,
         };
 

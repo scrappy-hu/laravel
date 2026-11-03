@@ -1,7 +1,7 @@
 {
     "name": "scrappy-hu/laravel",
-    "description": "Official Scrappy SDK for Laravel — submit scrape jobs and verify webhooks against api.scrappy.hu.",
-    "keywords": ["scrappy", "laravel", "scraping", "webhooks", "api", "playwright"],
+    "description": "Official Scrappy SDK for Laravel — submit scrape jobs, run browser actions and verify webhooks against api.scrappy.hu.",
+    "keywords": ["scrappy", "laravel", "scraping", "webhooks", "api", "playwright", "browser-automation"],
     "license": "MIT",
     "type": "library",
     "homepage": "https://scrappy.hu",
@@ -20,6 +20,9 @@
     "require-dev": {
         "phpunit/phpunit": "^9.5|^10.5|^11.0",
         "orchestra/testbench": "^7.0|^8.0|^9.0|^10.0"
+    },
+    "suggest": {
+        "ext-sodium": "Required for Scrappy::actions() with secrets (sealed to Scrappy's public key)."
     },
     "autoload": {
         "psr-4": {

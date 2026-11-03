@@ -100,6 +100,45 @@ $job = Scrappy::jobs()->create(['url' => 'https://example.com', 'webhook_url' =>
 Set the key's default webhook URL in the dashboard and you can leave out
 `webhook_url`.
 
+## Run an action (preview)
+
+An action job runs steps in a real browser on a Scrappy worker (log in, add to cart, place an order), **at most once**. The spec format is in Scrappy's [ACTIONS.md](https://github.com/xupegroup/scrappy/blob/main/docs/ACTIONS.md). Your plan needs action jobs enabled.
+
+```php
+use Scrappy\Facades\Scrappy;
+use Scrappy\Models\ActionStatus;
+
+$result = Scrappy::actions()->run(
+    spec: $iponOrderSpec,                       // array: origin, steps, output …
+    params: ['product_id' => 123, 'quantity' => 2, 'max_net_price' => 15000],
+    secrets: [                                  // what {{secrets.*}} refers to
+        'username' => config('services.ipon.username'),
+        'password' => config('services.ipon.password'),
+    ],
+    session: 'xupe-ipon',                       // continue this browser session (stays logged in)
+    actionKey: "xupe-po-{$po->id}",             // never runs twice for the same key
+    deadlineSeconds: 120,                       // must start by then; no change starts after it
+);
+
+match ($result->status) {
+    ActionStatus::Succeeded => $po->markOrdered($result->output['order_id']),
+    ActionStatus::Rejected  => $po->markRejected($result->message),   // nothing changed: safe to retry
+    ActionStatus::Partial   => $po->needsManualCleanup($result),      // something changed and stayed
+    ActionStatus::Uncertain,
+    ActionStatus::Timeout   => $po->needsVerification($result),       // NEVER resubmit automatically
+    default                 => null,
+};
+```
+
+- **Secrets never leave your app in the clear.** `run()` seals them to Scrappy's public key (libsodium sealed box, `ext-sodium`) before sending: in your queue, logs and Scrappy's database they are ciphertext, and Scrappy keeps them only while the job runs. They are only typed on or sent to `origins` (default: the spec's origin; pass `origins:` for more).
+- **`session`** is your name for the browser session: the first job creates it, its cookies carry the login to the next job, and one job runs per session at a time (one account's cart is never in two jobs). `Scrappy::actions()->logout('xupe-ipon')` starts it fresh.
+- **`actionKey`**: calling `run()` again with the same key never starts a second job while the first is anything but rejected; it waits for (or returns) that one.
+- **Waiting**: `run()` holds `?wait=` requests until the job ends, by default up to the deadline plus the spec's `timeout_seconds`. Pass `waitSeconds:` to wait less; you then get `Timeout`, and `$result->mutationStarted` says whether to treat it as uncertain. The final outcome also arrives by webhook (below).
+- **Dry run**: `dryRun: true` runs everything up to the first step that would change something and stops (`Rejected`, reason `dry_run`); `$result->dryRunResult` says whether that step's element was found. Start every new spec with it.
+- Without waiting: `submit(...)` (same arguments), then `get($id, wait: 25)`, `wait($id, $seconds)`, `cancel($id)`.
+
+With `Route::scrappyWebhook()`, every ending also dispatches `Scrappy\Events\ActionCompleted` (`$event->action` is the `ActionResult`), and `ActionReconciled` when a late worker report settles an uncertain job.
+
 ## Read a job
 
 Results also stay readable for 24 hours after a job ends:

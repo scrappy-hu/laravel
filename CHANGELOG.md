@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0
+
+- `Scrappy::actions()`: action jobs (preview). `run()` submits and waits for the outcome (`ActionResult` with an `ActionStatus` enum: Succeeded, Rejected, Partial, Uncertain, Timeout); `submit()`, `get()`, `wait()`, `cancel()`, `logout()`.
+- Secrets are sealed to Scrappy's public key in the SDK (`ext-sodium`, libsodium sealed box) before they are sent; the key is fetched once and again after a rotation.
+- `session` (continue a named browser session), `actionKey` (never runs twice; a repeat call follows the earlier job), `dryRun`.
+- Webhooks: `action.completed` → `Scrappy\Events\ActionCompleted`, `action.reconciled` → `ActionReconciled`; `WebhookEvent::action()`.
+- `Client::get()` / `post()` take a per-request timeout.
+
 ## 0.2.1
 
 - `SCRAPPY_WEBHOOK_SECRET` is read again: in `config/scrappy.php` the `webhook_secret` key sat inside an unclosed comment block, so `verify()` and `Route::scrappyWebhook()` threw `config_error` unless the secret was set in code. If you published the config, republish it (`php artisan vendor:publish --tag=scrappy-config --force`) or close the comment above `webhook_secret` yourself.

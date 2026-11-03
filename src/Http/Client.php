@@ -56,24 +56,32 @@ final class Client
 
     /**
      * @param  array<string, mixed>  $query
+     * @param  int|null  $timeout  seconds, for a request Scrappy may hold (?wait=)
      * @return array<string, mixed>
      */
-    public function get(string $path, array $query = []): array
+    public function get(string $path, array $query = [], ?int $timeout = null): array
     {
-        return $this->request('GET', $path, ['query' => $query]);
+        return $this->request('GET', $path, ['query' => $query] + $this->timeout($timeout));
     }
 
     /**
      * @param  array<string, mixed>  $body
      * @param  array<string, string>  $headers
+     * @param  int|null  $timeout  seconds, for a request Scrappy may hold (?wait=)
      * @return array<string, mixed>
      */
-    public function post(string $path, array $body, array $headers = []): array
+    public function post(string $path, array $body, array $headers = [], ?int $timeout = null): array
     {
         return $this->request('POST', $path, [
             'body' => json_encode($body, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
             'headers' => $headers,
-        ]);
+        ] + $this->timeout($timeout));
+    }
+
+    /** @return array<string, int> */
+    private function timeout(?int $seconds): array
+    {
+        return $seconds !== null ? ['timeout' => $seconds] : [];
     }
 
     /**
@@ -137,6 +145,6 @@ final class Client
         // Hard-coded — composer doesn't provide a clean way to read the
         // installed version of the running package itself at runtime.
         // Bump on every release.
-        return '0.2.1';
+        return '0.3.0';
     }
 }

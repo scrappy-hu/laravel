@@ -6,6 +6,7 @@ namespace Scrappy;
 
 use GuzzleHttp\Client as Guzzle;
 use Scrappy\Http\Client;
+use Scrappy\Resources\Actions;
 use Scrappy\Resources\Jobs;
 use Scrappy\Resources\Me;
 use Scrappy\Resources\Webhooks;
@@ -27,6 +28,7 @@ class Scrappy
 {
     private readonly Client $http;
     private readonly Jobs $jobs;
+    private readonly Actions $actions;
     private readonly Me $me;
     private readonly Webhooks $webhooks;
 
@@ -40,6 +42,7 @@ class Scrappy
     ) {
         $this->http = new Client($apiKey, $baseUrl, $timeout, $guzzle);
         $this->jobs = new Jobs($this->http);
+        $this->actions = new Actions($this->http);
         $this->me = new Me($this->http);
         $this->webhooks = new Webhooks(
             $this->http,
@@ -51,6 +54,12 @@ class Scrappy
     public function jobs(): Jobs
     {
         return $this->jobs;
+    }
+
+    /** Action jobs: browser steps that may change something on a site, at most once. */
+    public function actions(): Actions
+    {
+        return $this->actions;
     }
 
     public function me(): Me
